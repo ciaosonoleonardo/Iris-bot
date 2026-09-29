@@ -33,7 +33,7 @@ def ask_groq_developer(prompt):
         "Rispondi sempre in italiano, in modo sintetico, preciso e tecnico."
     )
     payload = {
-        "model": "mixtral-8x7b-32768",
+        "model": "llama-3.3-70b-versatile",
         "messages": [
             {"role": "system", "content": system_instruction},
             {"role": "user", "content": prompt}
