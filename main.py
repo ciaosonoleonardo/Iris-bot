@@ -29,7 +29,7 @@ def ask_groq_developer(prompt):
         "Rispondi sempre in italiano, in modo sintetico, preciso e tecnico."
     )
     payload = {
-        "model": "llama-3.1-8b-instant",
+        "model": "llama-3.3-70b-versatile",
         "messages": [
             {"role": "system", "content": system_instruction},
             {"role": "user", "content": prompt}
