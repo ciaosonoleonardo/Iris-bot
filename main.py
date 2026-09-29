@@ -1,10 +1,11 @@
+import os
 import time
 import requests
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 TELEGRAM_TOKEN = "8887715725:AAH2VJckKDyJcyV2-cEqhouimPnrtr8KZyo"
-GROQ_API_KEY = "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"
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
 
 TELEGRAM_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/"
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -20,6 +21,9 @@ def run_dummy_server():
     server.serve_forever()
 
 def ask_groq_developer(prompt):
+    if not GROQ_API_KEY:
+        return "Errore: GROQ_API_KEY non trovata nelle variabili d'ambiente di Render."
+
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
@@ -43,7 +47,8 @@ def ask_groq_developer(prompt):
         if "choices" in data and len(data["choices"]) > 0:
             return data["choices"][0]["message"]["content"]
         elif "error" in data:
-            return f"Errore API Groq: {data['error'].get('message', 'Errore sconosciuto')}"
+            key_preview = f"{GROQ_API_KEY[:6]}...{GROQ_API_KEY[-4:]}" if len(GROQ_API_KEY) > 10 else GROQ_API_KEY
+            return f"Errore API Groq: {data['error'].get('message', 'Errore sconosciuto')}\n(Chiave letta: {key_preview})"
         else:
             return "Risposta non valida da Groq."
     except Exception as e:
