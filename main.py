@@ -37,8 +37,7 @@ def ask_openrouter_developer(prompt):
     )
     
     payload = {
-        # Usa Qwen 2.5 72B free (top per dev e programmazione)
-        "model": "qwen/qwen-2.5-72b-instruct:free",
+        "model": "deepseek/deepseek-r1:free",
         "messages": [
             {"role": "system", "content": system_instruction},
             {"role": "user", "content": prompt}
