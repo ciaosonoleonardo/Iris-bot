@@ -33,7 +33,7 @@ def ask_groq_developer(prompt):
         "Rispondi sempre in italiano, in modo sintetico, preciso e tecnico."
     )
     payload = {
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama3-70b-8192",
         "messages": [
             {"role": "system", "content": system_instruction},
             {"role": "user", "content": prompt}
@@ -47,8 +47,7 @@ def ask_groq_developer(prompt):
         if "choices" in data and len(data["choices"]) > 0:
             return data["choices"][0]["message"]["content"]
         elif "error" in data:
-            key_preview = f"{GROQ_API_KEY[:6]}...{GROQ_API_KEY[-4:]}" if len(GROQ_API_KEY) > 10 else GROQ_API_KEY
-            return f"Errore API Groq: {data['error'].get('message', 'Errore sconosciuto')}\n(Chiave letta: {key_preview})"
+            return f"Errore API Groq: {data['error'].get('message', 'Errore sconosciuto')}"
         else:
             return "Risposta non valida da Groq."
     except Exception as e:
