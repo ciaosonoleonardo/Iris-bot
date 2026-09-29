@@ -1,8 +1,21 @@
 import time
 import requests
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 TOKEN = "8887715725:AAH2VJckKDyJcyV2-cEqhouimPnrtr8KZyo"
 URL = f"https://api.telegram.org/bot{TOKEN}/"
+
+# Server dummy per far contento Render Web Service
+class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Iris is running!")
+
+def run_dummy_server():
+    server = HTTPServer(('0.0.0.0', 10000), SimpleHTTPRequestHandler)
+    server.serve_forever()
 
 def get_updates(offset=None):
     try:
@@ -20,6 +33,10 @@ def send_message(chat_id, text):
 
 def main():
     print("🟢 Iris è in fase di avvio...")
+    
+    # Avvia il server web in un thread separato
+    threading.Thread(target=run_dummy_server, daemon=True).start()
+    
     last_update_id = None
     
     while True:
