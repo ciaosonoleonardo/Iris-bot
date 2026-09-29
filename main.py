@@ -37,7 +37,7 @@ def ask_openrouter_developer(prompt):
     )
     
     payload = {
-        "model": "deepseek/deepseek-r1:free",
+        "model": "meta-llama/llama-3.3-70b-instruct:free",
         "messages": [
             {"role": "system", "content": system_instruction},
             {"role": "user", "content": prompt}
