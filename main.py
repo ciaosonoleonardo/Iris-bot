@@ -21,11 +21,13 @@ def run_dummy_server():
     server.serve_forever()
 
 def ask_openrouter_developer(prompt):
-    if not OPENROUTER_API_KEY:
-        return "⚠️ Errore: OPENROUTER_API_KEY non trovata nelle Environment Variables di Render."
+    api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+    
+    if not api_key:
+        return "⚠️ Errore: OPENROUTER_API_KEY non trovata nelle Environment Variables su Render."
 
     headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
         "HTTP-Referer": "https://gorhub.dev",
         "X-Title": "Gor Hub David Dev"
@@ -36,34 +38,29 @@ def ask_openrouter_developer(prompt):
         "Rispondi sempre in italiano, in modo sintetico, preciso e altamente tecnico."
     )
     
-    # Lista di modelli gratuiti su OpenRouter provati in sequenza
-    models_to_try = [
-        "mistralai/mistral-7b-instruct:free",
-        "meta-llama/llama-3.2-11b-vision-instruct:free",
-        "qwen/qwen-2-7b-instruct:free",
-        "google/gemma-2-9b-it:free"
-    ]
+    # openrouter/free seleziona automaticamente il miglior modello gratuito disponibile
+    payload = {
+        "model": "openrouter/free",
+        "messages": [
+            {"role": "system", "content": system_instruction},
+            {"role": "user", "content": prompt}
+        ]
+    }
     
-    for model_id in models_to_try:
-        payload = {
-            "model": model_id,
-            "messages": [
-                {"role": "system", "content": system_instruction},
-                {"role": "user", "content": prompt}
-            ]
-        }
+    try:
+        res = requests.post(OPENROUTER_URL, headers=headers, json=payload, timeout=25)
+        data = res.json()
         
-        try:
-            res = requests.post(OPENROUTER_URL, headers=headers, json=payload, timeout=15)
-            data = res.json()
+        if "choices" in data and len(data["choices"]) > 0:
+            return data["choices"][0]["message"]["content"]
+        elif "error" in data:
+            err_msg = data["error"].get("message", "Errore sconosciuto")
+            return f"Errore OpenRouter: {err_msg}"
+        else:
+            return f"Risposta inattesa da OpenRouter: {data}"
             
-            if "choices" in data and len(data["choices"]) > 0:
-                return data["choices"][0]["message"]["content"]
-            # Se c'è un errore di modello mancante/a pagamento, continua il ciclo ed entra nel modello successivo
-        except Exception:
-            continue
-
-    return "Errore: Tutti i modelli gratuiti sono momentaneamente non disponibili. Riprova tra poco."
+    except Exception as e:
+        return f"Errore durante la connessione ad OpenRouter: {str(e)}"
 
 def get_updates(offset=None):
     try:
