@@ -36,11 +36,12 @@ def ask_openrouter_developer(prompt):
         "Rispondi sempre in italiano, in modo sintetico, preciso e altamente tecnico."
     )
     
-    # Modelli 100% gratuiti accessibili senza crediti minimi
+    # Lista di modelli gratuiti su OpenRouter provati in sequenza
     models_to_try = [
-        "google/gemma-2-9b-it:free",
         "mistralai/mistral-7b-instruct:free",
-        "qwen/qwen-2-7b-instruct:free"
+        "meta-llama/llama-3.2-11b-vision-instruct:free",
+        "qwen/qwen-2-7b-instruct:free",
+        "google/gemma-2-9b-it:free"
     ]
     
     for model_id in models_to_try:
@@ -53,17 +54,16 @@ def ask_openrouter_developer(prompt):
         }
         
         try:
-            res = requests.post(OPENROUTER_URL, headers=headers, json=payload, timeout=20)
+            res = requests.post(OPENROUTER_URL, headers=headers, json=payload, timeout=15)
             data = res.json()
             
             if "choices" in data and len(data["choices"]) > 0:
                 return data["choices"][0]["message"]["content"]
-            elif "error" in data and "unavailable" not in str(data["error"]).lower():
-                return f"Errore API: {data['error'].get('message', 'Errore generico')}"
+            # Se c'è un errore di modello mancante/a pagamento, continua il ciclo ed entra nel modello successivo
         except Exception:
             continue
 
-    return "Errore: I modelli gratuiti sono momentaneamente occupati su OpenRouter. Riprova tra poco."
+    return "Errore: Tutti i modelli gratuiti sono momentaneamente non disponibili. Riprova tra poco."
 
 def get_updates(offset=None):
     try:
