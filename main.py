@@ -23,17 +23,24 @@ def inter_agent_webhook():
     logging.info(f"David ha ricevuto il task da Mom: {data}")
     
     reply_text = (
-        "🛠️️ **DAVID (CTO)**: Direttive acquisite da Mom! "
+        "🛠️ **DAVID (CTO)**: Direttive acquisite da Mom! "
         "Avvio immediato della configurazione tecnica dell'infrastruttura backend e gestione dei webhook."
     )
     
     if chat_id and TELEGRAM_TOKEN:
         try:
             url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-            requests.post(url, json={"chat_id": chat_id, "text": reply_text, "parse_mode": "Markdown"})
-            logging.info("David ha inviato la conferma nel gruppo Telegram.")
+            payload = {
+                "chat_id": chat_id,
+                "text": reply_text,
+                "parse_mode": "Markdown"
+            }
+            response = requests.post(url, json=payload, timeout=10)
+            logging.info(f"Risposta Telegram inviata da David. Status: {response.status_code}")
         except Exception as e:
             logging.error(f"Errore invio messaggio Telegram da David: {e}")
+    else:
+        logging.warning("Impossibile inviare il messaggio: chat_id o TELEGRAM_TOKEN mancanti.")
             
     return jsonify({"status": "executed", "agent": "David"}), 200
 
