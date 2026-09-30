@@ -1,105 +1,110 @@
 import os
-import time
+import logging
+from flask import Flask, request, jsonify
 import requests
-import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from telegram import Update
+from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 
-TELEGRAM_TOKEN = "8887715725:AAH2VJckKDyJcyV2-cEqhouimPnrtr8KZyo"
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "").strip()
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 
-TELEGRAM_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/"
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 
-class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"David Dev AI is online!")
+MODELS_TO_TRY = [
+    "openrouter/free",
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    "qwen/qwen3.8-27b:free",
+    "google/gemma-4-26b-a4b-it:free"
+]
 
-def run_dummy_server():
-    server = HTTPServer(('0.0.0.0', 10000), SimpleHTTPRequestHandler)
-    server.serve_forever()
+SYSTEM_INSTRUCTION = """
+Sei David, il Lead Tech Architect & Developer dell'ecosistema autonomo "Gor Hub".
+Progetti, sviluppi, ottimizzi e mantieni l'intera infrastruttura software dell'ecosistema (Python, Flask, Telegram API, Render, OpenRouter, Persistenza dati e Webhooks).
 
-def ask_openrouter_developer(prompt):
-    api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
-    
-    if not api_key:
-        return "⚠️ Errore: OPENROUTER_API_KEY non trovata nelle Environment Variables su Render."
+IL TUO METODO OPERATIVO IN 3 PASSI:
+1. Diagnosi & Architettura: Analizza i requisiti, individua la struttura di codice più solida, prevedendo persistenza dei dati, sicurezza e interconnessione tramite API/Webhook tra gli agenti (Mom, Ilaria, David).
+2. Codice Clean, Resiliente e "Copy-Paste Ready": Fornisci sempre codice Python completo, ben commentato e pronto all'uso. Includi la gestione dei fallback multi-modello, gestione eccezioni (try-except) e threading sicuro tra Flask e Telegram.
+3. Deployment & Infrastructure Kit: Insieme al codice, fornisci sempre:
+   - Dipendenze per requirements.txt.
+   - Variabili d'ambiente necessarie (.env).
+   - Istruzioni per il deploy su Render, test Webhook e verifica dei log.
 
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://gorhub.dev",
-        "X-Title": "Gor Hub David Dev"
-    }
-    
-    system_instruction = (
-        "Sei David, il Lead Developer di Gor Hub. "
-        "Rispondi sempre in italiano, in modo sintetico, preciso e altamente tecnico."
-    )
-    
-    # openrouter/free seleziona automaticamente il miglior modello gratuito disponibile
-    payload = {
-        "model": "openrouter/free",
-        "messages": [
-            {"role": "system", "content": system_instruction},
-            {"role": "user", "content": prompt}
-        ]
-    }
-    
-    try:
-        res = requests.post(OPENROUTER_URL, headers=headers, json=payload, timeout=25)
-        data = res.json()
-        
-        if "choices" in data and len(data["choices"]) > 0:
-            return data["choices"][0]["message"]["content"]
-        elif "error" in data:
-            err_msg = data["error"].get("message", "Errore sconosciuto")
-            return f"Errore OpenRouter: {err_msg}"
-        else:
-            return f"Risposta inattesa da OpenRouter: {data}"
-            
-    except Exception as e:
-        return f"Errore durante la connessione ad OpenRouter: {str(e)}"
+TONO E STILE:
+- Pragmatico, sintetico, altamente tecnico ed essenziale. Zero preamboli: dai subito diagnosi e codice operativo.
+"""
 
-def get_updates(offset=None):
-    try:
-        response = requests.get(TELEGRAM_URL + "getUpdates", params={"timeout": 100, "offset": offset})
-        return response.json()
-    except Exception:
-        return None
+app_flask = Flask('')
 
-def send_message(chat_id, text):
-    try:
-        requests.post(TELEGRAM_URL + "sendMessage", data={"chat_id": chat_id, "text": text})
-    except Exception as e:
-        print(f"Errore invio: {e}")
+@app_flask.route('/')
+def home():
+    return "David Tech Core is online."
+
+@app_flask.route('/webhook', methods=['POST'])
+def inter_agent_webhook():
+    # Endpoint predisposto per la comunicazione futura tra agenti
+    data = request.get_json() or {}
+    logging.info(f"Ricevuto segnale inter-agente: {data}")
+    return jsonify({"status": "received", "agent": "David"}), 200
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("David online, Leo. Architettura e Tech Core di Gor Hub pronti. Quale modulo o codice dobbiamo sviluppare?")
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_text = update.message.text
+    reply = None
+
+    for model_name in MODELS_TO_TRY:
+        try:
+            response = requests.post(
+                url="https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://davidgorbot.onrender.com",
+                    "X-Title": "Gor Hub David"
+                },
+                json={
+                    "model": model_name,
+                    "messages": [
+                        {"role": "system", "content": SYSTEM_INSTRUCTION},
+                        {"role": "user", "content": user_text}
+                    ]
+                },
+                timeout=30
+            )
+            res_json = response.json()
+            if "choices" in res_json and len(res_json["choices"]) > 0:
+                reply = res_json["choices"][0]["message"]["content"]
+                break
+        except Exception as e:
+            logging.error(f"Errore con {model_name}: {e}")
+
+    if reply:
+        await update.message.reply_text(reply)
+    else:
+        await update.message.reply_text("DAVID: Errore di connessione al provider AI/OpenRouter.")
 
 def main():
-    print("🟢 David Dev (OpenRouter) avviato...")
-    threading.Thread(target=run_dummy_server, daemon=True).start()
-    
-    last_update_id = None
-    
-    while True:
-        updates = get_updates(last_update_id)
-        if updates and "result" in updates:
-            for update in updates["result"]:
-                last_update_id = update["update_id"] + 1
-                
-                if "message" in update and "text" in update["message"]:
-                    chat_id = update["message"]["chat"]["id"]
-                    text = update["message"]["text"]
-                    
-                    if text == "/start":
-                        send_message(chat_id, "💻 **David (Gor Hub Lead Dev)** online. Dimmi pure!")
-                    elif text == "/ping":
-                        send_message(chat_id, "Pong 🟢 David Dev è online!")
-                    else:
-                        dev_response = ask_openrouter_developer(text)
-                        send_message(chat_id, dev_response)
-        
-        time.sleep(1)
+    if not TELEGRAM_TOKEN or not OPENROUTER_API_KEY:
+        print("ERRORE: Variabili d'ambiente mancanti su Render.")
+        return
+
+    port = int(os.environ.get("PORT", 10000))
+    app_flask.run(host='0.0.0.0', port=port, threaded=True, use_reloader=False)
 
 if __name__ == "__main__":
-    main()
+    telegram_app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    telegram_app.add_handler(CommandHandler("start", start))
+    telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
+    print("David Bot in ascolto...")
+    
+    import threading
+    t = threading.Thread(target=main)
+    t.daemon = True
+    t.start()
+
+    telegram_app.run_polling()
