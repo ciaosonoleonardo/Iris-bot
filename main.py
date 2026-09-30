@@ -23,14 +23,15 @@ def inter_agent_webhook():
     logging.info(f"David ha ricevuto il task da Mom: {data}")
     
     reply_text = (
-        "🛠️ **DAVID (CTO)**: Ricevuto! Struttura tecnica in lavorazione. "
-        "Avvio il setup degli endpoint Flask, la gestione dei payload e la connessione del database."
+        "🛠️️ **DAVID (CTO)**: Direttive acquisite da Mom! "
+        "Avvio immediato della configurazione tecnica dell'infrastruttura backend e gestione dei webhook."
     )
     
     if chat_id and TELEGRAM_TOKEN:
         try:
             url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
             requests.post(url, json={"chat_id": chat_id, "text": reply_text, "parse_mode": "Markdown"})
+            logging.info("David ha inviato la conferma nel gruppo Telegram.")
         except Exception as e:
             logging.error(f"Errore invio messaggio Telegram da David: {e}")
             
