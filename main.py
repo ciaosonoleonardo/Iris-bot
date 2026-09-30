@@ -20,10 +20,10 @@ def inter_agent_webhook():
     data = request.get_json() or {}
     chat_id = data.get("chat_id")
     
-    logging.info(f"David ha ricevuto il task da Mom: {data}")
+    logging.info(f"David ha ricevuto il task confermato da Mom: {data}")
     
     reply_text = (
-        "🛠️ **DAVID (CTO)**: Direttive acquisite da Mom! "
+        "🛠️ **DAVID (CTO)**: Piano approvato da Mom! "
         "Avvio immediato della configurazione tecnica dell'infrastruttura backend e gestione dei webhook."
     )
     
