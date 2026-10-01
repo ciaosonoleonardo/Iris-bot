@@ -14,7 +14,6 @@ from telegram.ext import (
     filters,
 )
 
-
 # ============================================================
 # LOGGING
 # ============================================================
@@ -26,7 +25,6 @@ logging.basicConfig(
 
 logger = logging.getLogger("DAVID")
 
-
 # ============================================================
 # ENVIRONMENT VARIABLES
 # ============================================================
@@ -34,21 +32,16 @@ logger = logging.getLogger("DAVID")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
 
-
 # ============================================================
 # FLASK
 # ============================================================
 
 flask_app = Flask(__name__)
 
-
-# Coda interna
 webhook_queue = queue.Queue(
     maxsize=100
 )
 
-
-# Applicazione Telegram
 tg_app = None
 
 
@@ -141,12 +134,13 @@ def webhook():
                 }
             ), 400
 
-        # ----------------------------------------------------
-        # DATI MINIMI OBBLIGATORI
-        # ----------------------------------------------------
+        chat_id = data.get(
+            "chat_id"
+        )
 
-        chat_id = data.get("chat_id")
-        full_plan = data.get("full_plan")
+        full_plan = data.get(
+            "full_plan"
+        )
 
         if not chat_id or not full_plan:
 
@@ -154,7 +148,10 @@ def webhook():
                 {
                     "status": "error",
                     "agent": "David",
-                    "message": "Missing chat_id or full_plan",
+                    "message": (
+                        "Missing chat_id "
+                        "or full_plan"
+                    ),
                 }
             ), 400
 
@@ -164,17 +161,16 @@ def webhook():
 
         try:
 
-            webhook_queue.put_nowait(data)
+            webhook_queue.put_nowait(
+                data
+            )
 
         except queue.Full:
 
             logger.error(
-                "Coda David piena. Payload rifiutato."
+                "Coda David piena. "
+                "Payload rifiutato."
             )
-
-            # NON restituiamo 200.
-            # M.O.M. deve sapere che il payload
-            # non è stato accettato.
 
             return jsonify(
                 {
@@ -185,10 +181,10 @@ def webhook():
             ), 503
 
         logger.info(
-            "Payload M.O.M. inserito nella coda."
+            "Payload M.O.M. inserito "
+            "nella coda David."
         )
 
-        # 202 = ricevuto e accettato per elaborazione
         return jsonify(
             {
                 "status": "queued",
@@ -255,9 +251,6 @@ async def webhook_worker():
 
         try:
 
-            # queue.Queue è bloccante.
-            # Lo spostiamo fuori dall'event loop.
-
             data = await asyncio.to_thread(
                 webhook_queue.get
             )
@@ -276,15 +269,19 @@ async def webhook_worker():
                 )
 
                 if not chat_id:
+
                     logger.warning(
                         "Payload senza chat_id."
                     )
+
                     continue
 
                 if not full_plan:
+
                     logger.warning(
-                        "Payload senza piano."
+                        "Payload senza full_plan."
                     )
+
                     continue
 
                 if not tg_app:
@@ -295,18 +292,14 @@ async def webhook_worker():
 
                     continue
 
-                # ------------------------------------------------
-                # MESSAGGIO TELEGRAM
-                # ------------------------------------------------
-
                 message = (
                     "🛠️ DAVID — CTO\n\n"
                     "Piano ricevuto da M.O.M. "
                     "correttamente.\n\n"
-                    "Avvio l'analisi tecnica del piano "
-                    "e la definizione delle attività "
-                    "di infrastruttura, backend, API "
-                    "e automazioni."
+                    "Avvio l'analisi tecnica "
+                    "del piano e la definizione "
+                    "delle attività di infrastruttura, "
+                    "backend, API e automazioni."
                 )
 
                 await tg_app.bot.send_message(
@@ -315,13 +308,12 @@ async def webhook_worker():
                 )
 
                 logger.info(
-                    "Conferma Telegram inviata da David."
+                    "Conferma Telegram "
+                    "inviata da David."
                 )
 
             finally:
 
-                # Segnala alla queue che il lavoro
-                # è stato consumato.
                 webhook_queue.task_done()
 
         except asyncio.CancelledError:
@@ -355,7 +347,7 @@ async def post_init(
 
 
 # ============================================================
-# TELEGRAM /START
+# START
 # ============================================================
 
 async def start(
@@ -374,7 +366,7 @@ async def start(
 
 
 # ============================================================
-# TELEGRAM MESSAGES
+# MESSAGGI TELEGRAM
 # ============================================================
 
 async def handle_message(
@@ -387,8 +379,8 @@ async def handle_message(
 
     await update.message.reply_text(
         "David online.\n"
-        "Sistemi di automazione, backend "
-        "e API monitorati."
+        "Sistemi di automazione, "
+        "backend e API monitorati."
     )
 
 
@@ -416,14 +408,12 @@ def main():
 
         return
 
-    # Flask
     threading.Thread(
         target=start_flask,
         daemon=True,
         name="DavidFlask",
     ).start()
 
-    # Telegram
     application = (
         ApplicationBuilder()
         .token(TELEGRAM_TOKEN)
