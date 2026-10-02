@@ -16,7 +16,6 @@ from telegram.ext import (
     filters,
 )
 
-
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
@@ -24,10 +23,8 @@ logging.basicConfig(
 
 logger = logging.getLogger("DAVID")
 
-
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
-
 
 flask_app = Flask(__name__)
 
@@ -50,7 +47,11 @@ def configuration_ok():
             "Variabili Environment mancanti: %s",
             ", ".join(missing),
         )
-    @flask_app.route("/", methods=["GET"])
+        return False
+
+    return True
+
+@flask_app.route("/", methods=["GET"])
 def home():
     return "David CTO Core online.", 200
 
@@ -67,11 +68,11 @@ def health():
 
 @flask_app.route("/webhook", methods=["POST"])
 def webhook():
-
     received_secret = request.headers.get("X-Webhook-Secret")
 
     if not WEBHOOK_SECRET:
         logger.error("WEBHOOK_SECRET non configurato.")
+
         return jsonify(
             {
                 "status": "error",
@@ -80,7 +81,9 @@ def webhook():
         ), 500
 
     if received_secret != WEBHOOK_SECRET:
-        logger.warning("Webhook David rifiutato: secret non valido.")
+        logger.warning(
+            "Webhook David rifiutato: secret non valido."
+        )
 
         return jsonify(
             {
@@ -124,7 +127,9 @@ def webhook():
         ), 200
 
     except Exception:
-        logger.exception("Errore durante la gestione del webhook.")
+        logger.exception(
+            "Errore durante la gestione del webhook."
+        )
 
         return jsonify(
             {
@@ -132,7 +137,8 @@ def webhook():
                 "message": "Internal server error",
             }
         ), 500
-    def start_flask():
+
+def start_flask():
     try:
         port = int(os.getenv("PORT", "10000"))
 
@@ -151,9 +157,7 @@ def webhook():
 
 
 async def webhook_worker(application):
-
     while True:
-
         try:
             data = await asyncio.to_thread(
                 webhook_queue.get
@@ -207,15 +211,14 @@ async def webhook_worker(application):
 
 
 async def post_init(application):
-
     application.create_task(
         webhook_worker(application)
-)
+        )
+
 async def start(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
-
     if not update.message:
         return
 
@@ -230,7 +233,6 @@ async def handle_message(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
-
     if not update.message:
         return
 
@@ -238,9 +240,6 @@ async def handle_message(
 
     if not chat:
         return
-
-    # Nei gruppi David non risponde ai normali messaggi.
-    # Riceve i piani direttamente tramite webhook di M.O.M.
 
     if chat.type in ("group", "supergroup"):
         return
@@ -252,7 +251,6 @@ async def handle_message(
 
 
 def main():
-
     global tg_app
 
     if not configuration_ok():
