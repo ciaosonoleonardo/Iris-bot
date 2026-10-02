@@ -2,10 +2,12 @@ import os
 import logging
 import threading
 import queue
+import requests
 import asyncio
 
 from flask import Flask, request, jsonify
 
+from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
     ContextTypes,
@@ -14,9 +16,6 @@ from telegram.ext import (
     filters,
 )
 
-# ============================================================
-# LOGGING
-# ============================================================
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -25,46 +24,39 @@ logging.basicConfig(
 
 logger = logging.getLogger("DAVID")
 
-# ============================================================
-# ENVIRONMENT VARIABLES
-# ============================================================
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
 
-# ============================================================
-# FLASK
-# ============================================================
 
 flask_app = Flask(__name__)
 
-webhook_queue = queue.Queue(
-    maxsize=100
-)
+webhook_queue = queue.Queue(maxsize=100)
 
 tg_app = None
 
 
-# ============================================================
-# HOME
-# ============================================================
+def configuration_ok():
+    missing = []
 
-@flask_app.route("/", methods=["GET"])
+    if not TELEGRAM_TOKEN:
+        missing.append("TELEGRAM_TOKEN")
+
+    if not WEBHOOK_SECRET:
+        missing.append("WEBHOOK_SECRET")
+
+    if missing:
+        logger.error(
+            "Variabili Environment mancanti: %s",
+            ", ".join(missing),
+        )
+    @flask_app.route("/", methods=["GET"])
 def home():
+    return "David CTO Core online.", 200
 
-    return (
-        "David CTO Core online.",
-        200,
-    )
-
-
-# ============================================================
-# HEALTH
-# ============================================================
 
 @flask_app.route("/health", methods=["GET"])
 def health():
-
     return jsonify(
         {
             "status": "ok",
@@ -73,39 +65,22 @@ def health():
     ), 200
 
 
-# ============================================================
-# WEBHOOK
-# ============================================================
-
 @flask_app.route("/webhook", methods=["POST"])
 def webhook():
 
-    # --------------------------------------------------------
-    # CONTROLLO SEGRETO
-    # --------------------------------------------------------
+    received_secret = request.headers.get("X-Webhook-Secret")
 
     if not WEBHOOK_SECRET:
-
-        logger.error(
-            "WEBHOOK_SECRET non configurato."
-        )
-
+        logger.error("WEBHOOK_SECRET non configurato.")
         return jsonify(
             {
                 "status": "error",
-                "message": "Server configuration error",
+                "message": "Server not configured",
             }
         ), 500
 
-    incoming_secret = request.headers.get(
-        "X-MOM-Secret"
-    )
-
-    if incoming_secret != WEBHOOK_SECRET:
-
-        logger.warning(
-            "Tentativo webhook non autorizzato."
-        )
+    if received_secret != WEBHOOK_SECRET:
+        logger.warning("Webhook David rifiutato: secret non valido.")
 
         return jsonify(
             {
@@ -114,113 +89,52 @@ def webhook():
             }
         ), 401
 
-    # --------------------------------------------------------
-    # JSON
-    # --------------------------------------------------------
-
     try:
-
-        data = request.get_json(
-            silent=True
-        )
+        data = request.get_json(silent=True)
 
         if not isinstance(data, dict):
-
             return jsonify(
                 {
                     "status": "error",
-                    "agent": "David",
                     "message": "Invalid JSON",
                 }
             ), 400
 
-        chat_id = data.get(
-            "chat_id"
-        )
-
-        full_plan = data.get(
-            "full_plan"
-        )
-
-        if not chat_id or not full_plan:
-
-            return jsonify(
-                {
-                    "status": "error",
-                    "agent": "David",
-                    "message": (
-                        "Missing chat_id "
-                        "or full_plan"
-                    ),
-                }
-            ), 400
-
-        # ----------------------------------------------------
-        # CODA
-        # ----------------------------------------------------
-
         try:
-
-            webhook_queue.put_nowait(
-                data
-            )
+            webhook_queue.put_nowait(data)
 
         except queue.Full:
-
-            logger.error(
-                "Coda David piena. "
-                "Payload rifiutato."
-            )
+            logger.error("Coda webhook David piena.")
 
             return jsonify(
                 {
                     "status": "error",
-                    "agent": "David",
                     "message": "Queue full",
                 }
             ), 503
 
-        logger.info(
-            "Payload M.O.M. inserito "
-            "nella coda David."
-        )
+        logger.info("Webhook ricevuto da M.O.M.")
 
         return jsonify(
             {
-                "status": "queued",
+                "status": "success",
                 "agent": "David",
                 "message": "Webhook queued",
             }
-        ), 202
+        ), 200
 
     except Exception:
-
-        logger.exception(
-            "Errore webhook David."
-        )
+        logger.exception("Errore durante la gestione del webhook.")
 
         return jsonify(
             {
                 "status": "error",
-                "agent": "David",
+                "message": "Internal server error",
             }
         ), 500
-
-
-# ============================================================
-# FLASK SERVER
-# ============================================================
-
-def start_flask():
-
+    def start_flask():
     try:
-
-        port = int(
-            os.getenv(
-                "PORT",
-                "10000",
-            )
-        )
+        port = int(os.getenv("PORT", "10000"))
 
         flask_app.run(
             host="0.0.0.0",
@@ -231,127 +145,74 @@ def start_flask():
         )
 
     except Exception:
-
         logger.exception(
             "Errore avvio Flask David."
         )
 
 
-# ============================================================
-# WORKER
-# ============================================================
-
-async def webhook_worker():
-
-    logger.info(
-        "Worker webhook David avviato."
-    )
+async def webhook_worker(application):
 
     while True:
 
         try:
-
             data = await asyncio.to_thread(
                 webhook_queue.get
             )
 
+            if not isinstance(data, dict):
+                continue
+
+            chat_id = data.get("chat_id")
+
+            if not chat_id:
+                logger.warning(
+                    "Webhook ricevuto senza chat_id."
+                )
+                continue
+
+            message = (
+                "🛠️ DAVID (CTO)\n\n"
+                "Piano ricevuto da M.O.M. correttamente.\n\n"
+                "Sto analizzando il piano dal punto di vista "
+                "tecnico e infrastrutturale.\n\n"
+                "Definirò backend, API, automazioni e "
+                "componenti tecniche necessarie."
+            )
+
             try:
-
-                if not isinstance(data, dict):
-                    continue
-
-                chat_id = data.get(
-                    "chat_id"
-                )
-
-                full_plan = data.get(
-                    "full_plan"
-                )
-
-                if not chat_id:
-
-                    logger.warning(
-                        "Payload senza chat_id."
-                    )
-
-                    continue
-
-                if not full_plan:
-
-                    logger.warning(
-                        "Payload senza full_plan."
-                    )
-
-                    continue
-
-                if not tg_app:
-
-                    logger.error(
-                        "tg_app non disponibile."
-                    )
-
-                    continue
-
-                message = (
-                    "🛠️ DAVID — CTO\n\n"
-                    "Piano ricevuto da M.O.M. "
-                    "correttamente.\n\n"
-                    "Avvio l'analisi tecnica "
-                    "del piano e la definizione "
-                    "delle attività di infrastruttura, "
-                    "backend, API e automazioni."
-                )
-
-                await tg_app.bot.send_message(
+                await application.bot.send_message(
                     chat_id=chat_id,
                     text=message,
                 )
 
                 logger.info(
-                    "Conferma Telegram "
-                    "inviata da David."
+                    "Risposta inviata a Telegram. chat_id=%s",
+                    chat_id,
                 )
 
-            finally:
-
-                webhook_queue.task_done()
+            except Exception:
+                logger.exception(
+                    "Errore invio Telegram David."
+                )
 
         except asyncio.CancelledError:
-
-            logger.info(
-                "Worker David cancellato."
-            )
-
             raise
 
         except Exception:
-
             logger.exception(
-                "Errore nel worker David."
+                "Errore nel worker webhook David."
             )
 
             await asyncio.sleep(1)
 
 
-# ============================================================
-# POST INIT
-# ============================================================
-
-async def post_init(
-    application
-):
+async def post_init(application):
 
     application.create_task(
-        webhook_worker()
-    )
-
-
-# ============================================================
-# START
-# ============================================================
-
+        webhook_worker(application)
+)
 async def start(
-    update,
+    update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
 
@@ -360,52 +221,41 @@ async def start(
 
     await update.message.reply_text(
         "David (CTO) operativo.\n\n"
-        "In attesa dei direttivi "
-        "infrastrutturali di M.O.M."
+        "In attesa dei direttivi infrastrutturali "
+        "di M.O.M."
     )
 
 
-# ============================================================
-# MESSAGGI TELEGRAM
-# ============================================================
-
 async def handle_message(
-    update,
+    update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
 
     if not update.message:
         return
 
+    chat = update.effective_chat
+
+    if not chat:
+        return
+
+    # Nei gruppi David non risponde ai normali messaggi.
+    # Riceve i piani direttamente tramite webhook di M.O.M.
+
+    if chat.type in ("group", "supergroup"):
+        return
+
     await update.message.reply_text(
         "David online.\n"
-        "Sistemi di automazione, "
-        "backend e API monitorati."
+        "Sistemi di automazione, backend e API monitorati."
     )
 
-
-# ============================================================
-# MAIN
-# ============================================================
 
 def main():
 
     global tg_app
 
-    if not TELEGRAM_TOKEN:
-
-        logger.error(
-            "TELEGRAM_TOKEN mancante!"
-        )
-
-        return
-
-    if not WEBHOOK_SECRET:
-
-        logger.error(
-            "WEBHOOK_SECRET mancante!"
-        )
-
+    if not configuration_ok():
         return
 
     threading.Thread(
@@ -413,6 +263,20 @@ def main():
         daemon=True,
         name="DavidFlask",
     ).start()
+
+    try:
+        requests.get(
+            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteWebhook",
+            params={
+                "drop_pending_updates": "true"
+            },
+            timeout=5,
+        )
+
+    except Exception:
+        logger.warning(
+            "Impossibile eseguire deleteWebhook."
+        )
 
     application = (
         ApplicationBuilder()
@@ -424,10 +288,7 @@ def main():
     tg_app = application
 
     application.add_handler(
-        CommandHandler(
-            "start",
-            start,
-        )
+        CommandHandler("start", start)
     )
 
     application.add_handler(
@@ -437,9 +298,7 @@ def main():
         )
     )
 
-    logger.info(
-        "David CTO avviato correttamente."
-    )
+    logger.info("David CTO avviato correttamente.")
 
     application.run_polling(
         drop_pending_updates=True
